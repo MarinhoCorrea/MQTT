@@ -9,9 +9,47 @@ init({
   sync: {},
 });
 
+const HISTORY_KEY = 'MQTT_HISTORY';
+
 export default class MQTTService {
   constructor() {
     this.client = null;
+  }
+
+  async getHistory() {
+    try {
+      const stored = await AsyncStorage.getItem(HISTORY_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.warn('Erro ao carregar histórico MQTT', error);
+      return [];
+    }
+  }
+
+  async saveHistory(messages) {
+    try {
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(messages));
+    } catch (error) {
+      console.warn('Erro ao salvar histórico MQTT', error);
+    }
+  }
+
+  async addHistoryItem(item) {
+    try {
+      const current = await this.getHistory();
+      const next = [item, ...current].slice(0, 50);
+      await this.saveHistory(next);
+    } catch (error) {
+      console.warn('Erro ao adicionar item ao histórico MQTT', error);
+    }
+  }
+
+  async clearHistory() {
+    try {
+      await AsyncStorage.removeItem(HISTORY_KEY);
+    } catch (error) {
+      console.warn('Erro ao limpar histórico MQTT', error);
+    }
   }
 
   connect(config, onMessage, onConnect, onFailure) {
@@ -24,11 +62,18 @@ export default class MQTTService {
       clientId
     );
 
-    this.client.onMessageArrived = (message) => {
-      onMessage(
-        message.destinationName,
-        message.payloadString
-      );
+    this.client.onMessageArrived = async (message) => {
+      const topic = message.destinationName;
+      const payload = message.payloadString;
+      const item = {
+        id: `${topic}-${Date.now()}`,
+        topic,
+        payload,
+        timestamp: new Date().toLocaleString(),
+      };
+
+      await this.addHistoryItem(item);
+      onMessage(topic, payload, item);
     };
 
     const options = {

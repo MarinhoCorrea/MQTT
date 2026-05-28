@@ -4,6 +4,7 @@ import MQTTService from './src/services/mqttService';
 import StatusModal from './src/components/StatusModal';
 import LightControl from './src/components/LightControl';
 import Gauges from './src/components/Gauges';
+import MessageHistory from './src/components/MessageHistory';
 
 const mqtt = new MQTTService();
 
@@ -13,6 +14,7 @@ export default function App() {
   const [isLightOn, setIsLightOn] = useState(false);
   const [temp, setTemp] = useState(0);
   const [hum, setHum] = useState(0);
+  const [history, setHistory] = useState([]);
 
   const mqttConfig = {
     host: process.env.EXPO_PUBLIC_MQTT_HOST,
@@ -24,16 +26,24 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadHistory();
     startConnection();
   }, []);
+
+  const loadHistory = async () => {
+    const saved = await mqtt.getHistory();
+    setHistory(saved);
+  };
+
   const startConnection = () => {
     setShowError(false);
     mqtt.connect(
       mqttConfig,
-      (topic, message) => {
+      (topic, message, item) => {
         if (topic === 'casa/temp') setTemp(parseFloat(message));
         if (topic === 'casa/umid') setHum(parseFloat(message));
-        if (topic === 'casa/luz') setIsLightOn(message === "1");
+        if (topic === 'casa/luz') setIsLightOn(message === '1');
+        setHistory((prev) => [item, ...prev].slice(0, 50));
       },
       () => {
         setIsConnected(true);
@@ -41,7 +51,7 @@ export default function App() {
         mqtt.subscribe('casa/umid');
         mqtt.subscribe('casa/luz');
       },
-      (err) => {
+      () => {
         setIsConnected(false);
         setShowError(true);
       }
@@ -49,9 +59,15 @@ export default function App() {
   };
 
   const toggleLight = () => {
-    const newState = isLightOn ? "0" : "1";
+    const newState = isLightOn ? '0' : '1';
     mqtt.publish('casa/luz', newState);
   };
+
+  const clearHistory = async () => {
+    await mqtt.clearHistory();
+    setHistory([]);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Smart Home IoT</Text>
@@ -60,7 +76,8 @@ export default function App() {
 
       <Gauges temp={temp} hum={hum} />
 
-      {/* Componente de Status de Conexão */}
+      <MessageHistory messages={history} onClear={clearHistory} />
+
       <StatusModal
         visible={showError}
         onRetry={startConnection}
