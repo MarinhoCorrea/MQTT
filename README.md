@@ -64,5 +64,6 @@ Este projeto conecta-se a um broker MQTT, recebe dados de temperatura, umidade e
 - O histórico mantém até 50 mensagens mais recentes.
 
 
-## 📌 Observação
-Este projeto usa persistência local no app, ideal para manter o histórico de mensagens mesmo quando o dispositivo é reiniciado.
+## Video Youtube
+Link: https://youtu.be/DTCaLAx-wRo
+
